@@ -1,0 +1,168 @@
+plugins {
+    id 'idea'
+    id 'eclipse'
+    id 'maven-publish'
+    id 'net.minecraftforge.gradle' version '6.0.16'
+    id 'jacoco'
+}
+
+version = project.mod_version
+group = project.mod_group_id
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+base {
+    archivesName = project.mod_id
+}
+
+repositories {
+    maven { url = 'https://cursemaven.com' }
+}
+
+minecraft {
+    mappings channel: project.mapping_channel, version: project.mapping_version
+
+    copyIdeResources = true
+
+    runs {
+        client {
+            workingDirectory project.file('run')
+
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+
+            mods {
+                "${project.mod_id}" {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        server {
+            workingDirectory project.file('run')
+
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+
+            mods {
+                "${project.mod_id}" {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        data {
+            workingDirectory project.file('run')
+
+            args '--mod', project.mod_id, '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
+
+            mods {
+                "${project.mod_id}" {
+                    source sourceSets.main
+                }
+            }
+        }
+    }
+}
+
+sourceSets.main.resources {
+    srcDirs += 'src/generated/resources'
+}
+
+dependencies {
+    minecraft "net.minecraftforge:forge:${project.minecraft_version}-${project.forge_version}"
+    compileOnly fg.deobf("curse.maven:oc2r-${project.oc2r_project_id}:${project.oc2r_file_id}")
+    runtimeOnly fg.deobf("curse.maven:oc2r-${project.oc2r_project_id}:${project.oc2r_file_id}")
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+jacoco {
+    toolVersion = '0.8.11'
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+    }
+    classDirectories.setFrom(
+        files(classDirectories.files.collect {
+            fileTree(dir: it, include: ['com/oc2rwireless/oc2rwireless/data/**'])
+        })
+    )
+}
+
+jacocoTestCoverageVerification {
+    dependsOn test
+    classDirectories.setFrom(
+        files(classDirectories.files.collect {
+            fileTree(dir: it, include: ['com/oc2rwireless/oc2rwireless/data/**'])
+        })
+    )
+    violationRules {
+        rule {
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.90
+            }
+        }
+        rule {
+            limit {
+                counter = 'BRANCH'
+                value = 'COVEREDRATIO'
+                minimum = 0.85
+            }
+        }
+    }
+}
+
+check.dependsOn jacocoTestCoverageVerification
+
+jar {
+    manifest {
+        attributes([
+                'Specification-Title': project.mod_name,
+                'Specification-Vendor': 'oc2rwireless authors',
+                'Specification-Version': '1',
+                'Implementation-Title': project.name,
+                'Implementation-Version': project.version,
+                'Implementation-Vendor': 'oc2rwireless'
+        ])
+    }
+}
+
+tasks.named('processResources', ProcessResources).configure {
+    var replaceProperties = [
+            mod_id           : project.mod_id,
+            mod_name         : project.mod_name,
+            mod_version      : project.mod_version,
+            mc_version       : project.mc_version,
+            forge_version    : project.forge_version
+    ]
+
+    inputs.properties(replaceProperties)
+
+    filesMatching('META-INF/mods.toml') {
+        expand replaceProperties + [project: project]
+    }
+}
+
+publishing {
+    publications {
+        create('mavenJava', MavenPublication) {
+            artifact jar
+        }
+    }
+    repositories {
+        maven {
+            name = 'mavenLocal'
+            url = layout.buildDirectory.dir('repo')
+        }
+    }
+}

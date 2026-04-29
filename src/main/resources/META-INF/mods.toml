@@ -1,0 +1,39 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="All Rights Reserved"
+issueTrackerURL="https://example.com/issues"
+displayURL="https://example.com"
+logoFile=""
+authors="oc2rwireless"
+credits=""
+displayName="${mod_name}"
+version="${mod_version}"
+description="A Forge 1.20.1 mod scaffold."
+
+[[mods]]
+modId="${mod_id}"
+version="${mod_version}"
+displayName="${mod_name}"
+description="A Forge 1.20.1 mod scaffold."
+authors="oc2rwireless"
+
+[[dependencies.oc2rwireless]]
+modId="minecraft"
+mandatory=true
+versionRange="[${mc_version},)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.oc2rwireless]]
+modId="forge"
+mandatory=true
+versionRange="[${forge_version},)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.oc2rwireless]]
+modId="oc2r"
+mandatory=true
+versionRange="[2.1.0,)"
+ordering="AFTER"
+side="BOTH"
