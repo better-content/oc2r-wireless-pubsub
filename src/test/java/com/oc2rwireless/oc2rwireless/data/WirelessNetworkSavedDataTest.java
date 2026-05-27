@@ -49,6 +49,21 @@ final class WirelessNetworkSavedDataTest {
     }
 
     @Test
+    void maxItemsUpperClampLeavesRemainingMessagesForNextPoll() {
+        for (int i = 1; i <= 70; i++) {
+            broker.publish("bulk", "m" + i);
+        }
+
+        final List<String> firstBatch = broker.poll("bulk", "c", 1000);
+        final List<String> secondBatch = broker.poll("bulk", "c", 1000);
+
+        assertEquals(64, firstBatch.size());
+        assertEquals("m1", firstBatch.get(0));
+        assertEquals("m64", firstBatch.get(63));
+        assertEquals(List.of("m65", "m66", "m67", "m68", "m69", "m70"), secondBatch);
+    }
+
+    @Test
     void listTopicsShowsPublishedTopics() {
         broker.publish("t.a", "1");
         broker.publish("t.b", "2");
@@ -88,6 +103,38 @@ final class WirelessNetworkSavedDataTest {
     }
 
     @Test
+    void pollMatchTreatsRegexMetacharactersAsLiteralTopicCharacters() {
+        broker.publish("factory[1]+main", "literal");
+        broker.publish("factoryyymain", "regex-looking");
+
+        final List<String> messages = broker.pollMatch("factory[1]+main", "group", 8);
+
+        assertEquals(List.of("factory[1]+main|literal"), messages);
+    }
+
+    @Test
+    void pollMatchQuestionMarkDoesNotConsumeMissingCharacter() {
+        broker.publish("node.a", "match");
+        broker.publish("node.", "too-short");
+        broker.publish("node.ab", "too-long");
+
+        assertEquals(List.of("node.a|match"), broker.pollMatch("node.?", "group", 8));
+    }
+
+    @Test
+    void pollMatchOffsetsAreIndependentPerTopic() {
+        broker.publish("sensor.a", "a1");
+        broker.publish("sensor.b", "b1");
+
+        assertTrue(broker.pollMatch("sensor.*", "shared", 8).containsAll(List.of("sensor.a|a1", "sensor.b|b1")));
+        assertTrue(broker.pollMatch("sensor.*", "shared", 8).isEmpty());
+
+        broker.publish("sensor.a", "a2");
+
+        assertEquals(List.of("sensor.a|a2"), broker.pollMatch("sensor.a", "shared", 8));
+    }
+
+    @Test
     void backlogTrimsToLimitForSlowConsumers() {
         for (int i = 1; i <= 300; i++) {
             broker.publish("trim", "m" + i);
@@ -97,6 +144,24 @@ final class WirelessNetworkSavedDataTest {
 
         assertEquals(256, broker.topicDepth("trim"));
         assertEquals("m45", firstBatch.get(0));
+    }
+
+    @Test
+    void existingConsumerOffsetIsAdvancedWhenBacklogTrimsPastIt() {
+        for (int i = 1; i <= 10; i++) {
+            broker.publish("trimmed", "m" + i);
+        }
+        assertEquals(List.of("m1"), broker.poll("trimmed", "slow", 1));
+
+        for (int i = 11; i <= 310; i++) {
+            broker.publish("trimmed", "m" + i);
+        }
+
+        final List<String> firstAvailableBatch = broker.poll("trimmed", "slow", 64);
+
+        assertEquals(256, broker.topicDepth("trimmed"));
+        assertEquals("m55", firstAvailableBatch.get(0));
+        assertEquals("m118", firstAvailableBatch.get(63));
     }
 
     @Test

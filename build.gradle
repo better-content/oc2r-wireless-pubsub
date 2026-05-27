@@ -25,6 +25,11 @@ minecraft {
     copyIdeResources = true
 
     runs {
+        configureEach {
+            property 'mixin.env.remapRefMap', 'true'
+            property 'mixin.env.refMapRemappingFile', "${buildDir}/createSrgToMcp/output.srg"
+        }
+
         client {
             workingDirectory project.file('run')
 
@@ -73,6 +78,8 @@ dependencies {
     minecraft "net.minecraftforge:forge:${project.minecraft_version}-${project.forge_version}"
     compileOnly fg.deobf("curse.maven:oc2r-${project.oc2r_project_id}:${project.oc2r_file_id}")
     runtimeOnly fg.deobf("curse.maven:oc2r-${project.oc2r_project_id}:${project.oc2r_file_id}")
+    runtimeOnly fg.deobf("curse.maven:markdownmanual-${project.markdown_manual_project_id}:${project.markdown_manual_file_id}")
+    runtimeOnly fg.deobf("curse.maven:architectury-api-${project.architectury_project_id}:${project.architectury_file_id}")
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
 }
 

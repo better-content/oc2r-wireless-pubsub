@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 public final class WirelessNetworkSavedData {
     private static final int MAX_TOPIC_BACKLOG = 256;
@@ -57,11 +58,18 @@ public final class WirelessNetworkSavedData {
     }
 
     private static boolean matches(final String pattern, final String value) {
-        final String regex = pattern
-            .replace(".", "\\.")
-            .replace("*", ".*")
-            .replace("?", ".");
-        return value.matches(regex);
+        final StringBuilder regex = new StringBuilder(pattern.length());
+        for (int i = 0; i < pattern.length(); i++) {
+            final char ch = pattern.charAt(i);
+            if (ch == '*') {
+                regex.append(".*");
+            } else if (ch == '?') {
+                regex.append('.');
+            } else {
+                regex.append(Pattern.quote(String.valueOf(ch)));
+            }
+        }
+        return value.matches(regex.toString());
     }
 
     private static final class TopicState {
