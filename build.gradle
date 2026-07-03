@@ -142,6 +142,20 @@ jar {
                 'Implementation-Vendor': 'oc2rwireless'
         ])
     }
+    finalizedBy 'reobfJar'
+}
+
+tasks.register('stageRuntimeJar', Copy) {
+    group = 'build'
+    description = 'Stages the reobfuscated runtime jar into build/libs using the canonical release filename.'
+    dependsOn tasks.named('reobfJar')
+    from layout.buildDirectory.file('reobfJar/output.jar')
+    into layout.buildDirectory.dir('libs')
+    rename { "${project.base.archivesName.get()}-${project.version}.jar" }
+}
+
+tasks.named('assemble').configure {
+    dependsOn tasks.named('stageRuntimeJar')
 }
 
 tasks.named('processResources', ProcessResources).configure {
