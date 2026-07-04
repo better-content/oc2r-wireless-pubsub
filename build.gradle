@@ -131,6 +131,18 @@ jacocoTestCoverageVerification {
 
 check.dependsOn jacocoTestCoverageVerification
 
+tasks.register('verifyFast') {
+    group = 'verification'
+    description = 'Runs the fast deterministic verification lane.'
+    dependsOn tasks.named('check')
+}
+
+tasks.register('verifyFull') {
+    group = 'verification'
+    description = 'Runs the full verification lane. This project currently has no higher-signal lane beyond verifyFast.'
+    dependsOn tasks.named('verifyFast')
+}
+
 jar {
     manifest {
         attributes([

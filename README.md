@@ -5,8 +5,11 @@ OC2R addon for Forge `1.20.1` that adds:
 - `Wireless Card` (OC2R card-slot RPC device).
 - Topic-style long-range messaging with linear energy cost by distance.
 
-## Build
-- `./gradlew build`
+## Verification
+- `./gradlew verifyFast`
+- `./gradlew verifyFull`
+
+`verifyFull` currently matches `verifyFast`; this repo has JVM tests and coverage gates, but no separate Forge GameTest lane yet.
 
 ## Runtime Requirements
 - Minecraft Forge `1.20.1`.
