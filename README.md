@@ -50,3 +50,7 @@ Helper scripts are provided in [assets/oc2rwireless/lua](/home/gerald/mcmods/def
 - `wifi-send.lua`
 - `wifi-topics.lua`
 - `wifi-tail.lua`
+
+## Community and support
+
+For modpack and mod discussion, playtest feedback, and bug reports, join the [Better Content Discord](https://discord.gg/EkRnZbzqS9).
