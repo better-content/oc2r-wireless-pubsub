@@ -4,7 +4,7 @@ license="AGPL-3.0-or-later"
 issueTrackerURL="https://example.com/issues"
 displayURL="https://example.com"
 logoFile=""
-authors="oc2rwireless"
+authors="oc2r_wireless_pubsub"
 credits=""
 displayName="${mod_name}"
 version="${mod_version}"
@@ -15,23 +15,23 @@ modId="${mod_id}"
 version="${mod_version}"
 displayName="${mod_name}"
 description="A Forge 1.20.1 mod scaffold."
-authors="oc2rwireless"
+authors="oc2r_wireless_pubsub"
 
-[[dependencies.oc2rwireless]]
+[[dependencies.oc2r_wireless_pubsub]]
 modId="minecraft"
 mandatory=true
 versionRange="[${mc_version},)"
 ordering="NONE"
 side="BOTH"
 
-[[dependencies.oc2rwireless]]
+[[dependencies.oc2r_wireless_pubsub]]
 modId="forge"
 mandatory=true
 versionRange="[${forge_version},)"
 ordering="NONE"
 side="BOTH"
 
-[[dependencies.oc2rwireless]]
+[[dependencies.oc2r_wireless_pubsub]]
 modId="oc2r"
 mandatory=true
 versionRange="[2.1.0,)"

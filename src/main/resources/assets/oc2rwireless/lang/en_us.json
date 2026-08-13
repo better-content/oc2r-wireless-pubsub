@@ -1,8 +1,0 @@
-{
-  "itemGroup.oc2rwireless": "OC2R Wireless",
-  "block.oc2rwireless.wireless_relay": "Wireless Relay",
-  "item.oc2rwireless.wireless_relay": "Wireless Relay",
-  "item.oc2rwireless.wireless_card": "Wireless Card",
-  "item.oc2rwireless.wireless_card.desc": "Topic-based long range wireless messaging for OC2R.",
-  "tooltip.oc2rwireless.distance_cost": "Energy cost scales linearly with link distance."
-}

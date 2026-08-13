@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "oc2r_wireless_pubsub:block/wireless_relay"
+    }
+  }
+}

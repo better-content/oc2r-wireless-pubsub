@@ -6,4 +6,4 @@ pluginManagement {
     }
 }
 
-rootProject.name = 'oc2rwireless'
+rootProject.name = 'oc2r-wireless-pubsub'
