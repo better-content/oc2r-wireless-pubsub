@@ -45,7 +45,7 @@ end
 ```
 
 ## Lua Helpers
-Helper scripts are provided in [assets/oc2r_wireless_pubsub/lua](/home/gerald/mcmods/deferred/oc2r_wireless_pubsub/src/main/resources/assets/oc2r_wireless_pubsub/lua):
+Helper scripts are provided in [assets/oc2r_wireless_pubsub/lua](src/main/resources/assets/oc2r_wireless_pubsub/lua):
 - `wifi.lua` library
 - `wifi-send.lua`
 - `wifi-topics.lua`
