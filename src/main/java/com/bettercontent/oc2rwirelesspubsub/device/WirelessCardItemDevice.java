@@ -29,7 +29,7 @@ public final class WirelessCardItemDevice {
         return new ObjectDevice(new CardRpcDevice(query), "wireless_card", "wireless", "message_bus");
     }
 
-    private record HostContext(ServerLevel level, BlockPos hostPos, String hostId) {
+    private record HostContext(ServerLevel level, BlockPos hostPos, String hostId, java.util.UUID owner) {
     }
 
     private static final class CardRpcDevice implements NamedDevice {
@@ -44,13 +44,13 @@ public final class WirelessCardItemDevice {
             return requireTopic(topic);
         }
 
-        @Callback(synchronize = false)
+        @Callback
         public List<Integer> push(@Parameter("topic") @Nullable final String topic,
                                   @Parameter("payload") @Nullable final String payload) {
             return send(topic, payload);
         }
 
-        @Callback(synchronize = false)
+        @Callback
         public List<Integer> send(@Parameter("topic") @Nullable final String topic,
                                   @Parameter("payload") @Nullable final String payload) {
             final String normalizedTopic = requireTopic(topic);
@@ -68,7 +68,7 @@ public final class WirelessCardItemDevice {
                 throw new IllegalStateException("Source relay has insufficient energy.");
             }
 
-            WirelessNetworkSavedData.get().publish(normalizedTopic, payload);
+            WirelessNetworkSavedData.get(host.level().getServer()).publish(normalizedTopic, payload, new WirelessNetworkSavedData.Origin(host.owner(),host.hostId(),java.util.UUID.randomUUID().toString(),energyCost,payloadBytes));
             return List.of(energyCost, payloadBytes);
         }
 
@@ -78,7 +78,10 @@ public final class WirelessCardItemDevice {
                                 @Parameter("consumerId") @Nullable final String consumerId) {
             final String normalizedTopic = requireTopic(topic);
             final String normalizedConsumer = normalizeConsumerId(consumerId);
-            return WirelessNetworkSavedData.get().poll(normalizedTopic, normalizedConsumer, max);
+            var host=getHostContext();
+            var messages=WirelessNetworkSavedData.get(host.level().getServer()).pollDelivered(normalizedTopic, normalizedConsumer, max);
+            received(host,messages);
+            return messages.stream().map(WirelessNetworkSavedData.Delivery::payload).toList();
         }
 
         @Callback
@@ -95,22 +98,31 @@ public final class WirelessCardItemDevice {
             if (pattern == null || pattern.isBlank()) {
                 throw new IllegalArgumentException("pattern cannot be empty");
             }
-            return WirelessNetworkSavedData.get().pollMatch(pattern, normalizeConsumerId(consumerId), maxPerTopic);
+            var host=getHostContext();
+            var messages=WirelessNetworkSavedData.get(host.level().getServer()).pollMatchDelivered(pattern, normalizeConsumerId(consumerId), maxPerTopic);
+            received(host,messages);
+            return messages.stream().map(m->m.topic()+"|"+m.payload()).toList();
         }
 
-        @Callback(synchronize = false)
+        @Callback
         public List<String> listTopics() {
-            return WirelessNetworkSavedData.get().listTopics();
+            return WirelessNetworkSavedData.get(getHostContext().level().getServer()).listTopics();
         }
 
-        @Callback(synchronize = false)
+        @Callback
         public int getTopicDepth(@Parameter("topic") @Nullable final String topic) {
-            return WirelessNetworkSavedData.get().topicDepth(requireTopic(topic));
+            return WirelessNetworkSavedData.get(getHostContext().level().getServer()).topicDepth(requireTopic(topic));
         }
 
         @Override
         public Collection<String> getDeviceTypeNames() {
             return List.of("wireless_card", "wireless", "message_bus");
+        }
+
+        private void received(HostContext host,List<WirelessNetworkSavedData.Delivery> messages){
+            for(var message:messages){var origin=message.origin();if(origin!=null&&origin.receivedBy(host.hostId())){
+                net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.bettercontent.oc2rwirelesspubsub.api.WirelessMessageReceivedEvent(host.level().getServer(),origin.owner(),origin.operation(),message.topic(),origin.bytes(),origin.energy()));
+            }}
         }
 
         private String normalizeConsumerId(@Nullable final String consumerId) {
@@ -131,13 +143,15 @@ public final class WirelessCardItemDevice {
             final Optional<BlockEntity> maybeBe = query.getContainerBlockEntity();
             if (maybeBe.isPresent() && maybeBe.get().getLevel() instanceof ServerLevel serverLevel) {
                 final BlockPos pos = maybeBe.get().getBlockPos();
-                return new HostContext(serverLevel, pos, "block:" + pos.toShortString());
+                var data=maybeBe.get().getPersistentData();
+                return new HostContext(serverLevel, pos, serverLevel.dimension().location()+":block:" + pos.asLong(), data.hasUUID(com.bettercontent.oc2rwirelesspubsub.api.WirelessOperators.KEY)?data.getUUID(com.bettercontent.oc2rwirelesspubsub.api.WirelessOperators.KEY):null);
             }
 
             final Optional<net.minecraft.world.entity.Entity> maybeEntity = query.getContainerEntity();
             if (maybeEntity.isPresent() && maybeEntity.get().level() instanceof ServerLevel serverLevel) {
                 final var entity = maybeEntity.get();
-                return new HostContext(serverLevel, entity.blockPosition(), "entity:" + entity.getUUID());
+                var data=entity.getPersistentData();
+                return new HostContext(serverLevel, entity.blockPosition(), "entity:" + entity.getUUID(), data.hasUUID(com.bettercontent.oc2rwirelesspubsub.api.WirelessOperators.KEY)?data.getUUID(com.bettercontent.oc2rwirelesspubsub.api.WirelessOperators.KEY):null);
             }
 
             throw new IllegalStateException("Wireless card is not in a server-side OC2R host context.");

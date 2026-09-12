@@ -176,4 +176,33 @@ final class WirelessNetworkSavedDataTest {
         assertEquals(0, broker.topicDepth("x"));
         assertTrue(broker.poll("y", "c", 10).isEmpty());
     }
+    @Test void attributedMessageAndConsumerOffsetSurviveReload() {
+        var owner=java.util.UUID.randomUUID();var origin=new WirelessNetworkSavedData.Origin(owner,"overworld:block:1","message:1",5,10);
+        broker.publish("jobs","payload",origin);
+        var restored=WirelessNetworkSavedData.load(broker.save(new net.minecraft.nbt.CompoundTag()));
+        var received=restored.pollDelivered("jobs","different-host",1);
+        assertEquals(1,received.size());assertEquals(origin,received.get(0).origin());assertEquals("payload",received.get(0).payload());
+        var again=WirelessNetworkSavedData.load(restored.save(new net.minecraft.nbt.CompoundTag()));
+        assertTrue(again.pollDelivered("jobs","different-host",1).isEmpty());
+    }
+    @Test void distinctWorldBrokersDoNotShareMessages(){var other=new WirelessNetworkSavedData();broker.publish("jobs","one");assertTrue(other.poll("jobs","consumer",1).isEmpty());}
+    @Test void anonymousAndUnownedMessagesRoundTripWithoutFabricatingAnOwner(){
+        broker.publish("plain","payload");broker.publish("plain","unowned",new WirelessNetworkSavedData.Origin(null,"host","operation",0,0));
+        var restored=WirelessNetworkSavedData.load(broker.save(new net.minecraft.nbt.CompoundTag()));
+        var delivery=restored.pollMatchDelivered("pl*","receiver",10);assertEquals(2,delivery.size());
+        org.junit.jupiter.api.Assertions.assertNull(delivery.get(0).origin());org.junit.jupiter.api.Assertions.assertNull(delivery.get(1).origin().owner());
+        assertTrue(restored.pollMatchDelivered("missing","receiver",10).isEmpty());
+    }
+    @Test void emptySavedBrokerLoadsAndRetainsNoTopics(){assertTrue(WirelessNetworkSavedData.load(new net.minecraft.nbt.CompoundTag()).listTopics().isEmpty());}
+    @Test void attributedMessagesRetainBacklogBoundsAfterReload(){
+        var origin=new WirelessNetworkSavedData.Origin(java.util.UUID.randomUUID(),"host","operation",4,1);
+        for(int i=0;i<300;i++)broker.publish("bounded",Integer.toString(i),origin);
+        var restored=WirelessNetworkSavedData.load(broker.save(new net.minecraft.nbt.CompoundTag()));
+        assertEquals(256,restored.topicDepth("bounded"));assertEquals("44",restored.pollDelivered("bounded","receiver",1).get(0).payload());
+    }
+    @Test void receiptRequiresAnOwnedMessageAndDifferentPhysicalHost(){
+        var origin=new WirelessNetworkSavedData.Origin(java.util.UUID.randomUUID(),"computer-a","message",5,8);
+        org.junit.jupiter.api.Assertions.assertFalse(origin.receivedBy("computer-a"));assertTrue(origin.receivedBy("computer-b"));
+        org.junit.jupiter.api.Assertions.assertFalse(new WirelessNetworkSavedData.Origin(null,"computer-a","message",5,8).receivedBy("computer-b"));
+    }
 }
