@@ -88,20 +88,20 @@ public final class WirelessRelayBlockEntity extends BlockEntity implements Named
         return energy.getMaxEnergyStored();
     }
 
-    @Callback(synchronize = false)
+    @Callback
     public List<String> listTopics() {
         if (!(level instanceof ServerLevel)) {
             return List.of();
         }
-        return WirelessNetworkSavedData.get().listTopics();
+        return WirelessNetworkSavedData.get(((ServerLevel)level).getServer()).listTopics();
     }
 
-    @Callback(synchronize = false)
+    @Callback
     public int getTopicDepth(final String topic) {
         if (!(level instanceof ServerLevel)) {
             return 0;
         }
-        return WirelessNetworkSavedData.get().topicDepth(topic);
+        return WirelessNetworkSavedData.get(((ServerLevel)level).getServer()).topicDepth(topic);
     }
 
     @Callback(synchronize = false)
