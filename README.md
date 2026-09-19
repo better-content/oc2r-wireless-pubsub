@@ -3,7 +3,7 @@
 OC2R addon for Forge `1.20.1` that adds:
 - `Wireless Relay` block (powered broker node).
 - `Wireless Card` (OC2R card-slot RPC device).
-- Topic-style long-range messaging with linear energy cost by distance.
+- Topic-style long-range messaging through a sender-side local relay.
 
 ## Verification
 - `./gradlew verifyFast`
@@ -27,9 +27,12 @@ The card exposes these methods through OC2R's `devices` Lua library:
 - `getTopicDepth(topic)` -> `int`
 
 Notes:
-- Topic space is global and JVM-memory-only (not persisted to world saves).
-- `consumerId` enables lightweight consumer groups with independent offsets.
-- Wildcards in `pollMatch` support `*` and `?`.
+- Topics are persisted separately for each Minecraft dimension. A sender needs one loaded relay within 16 blocks; receivers need no relay, and there are no relay chains, receiver charges, distance tolls, or cross-dimension access.
+- Accepted `send` calls charge only the sender-side relay once. Polling, listing, and delivery do not charge energy. Rejected topic/payload/storage requests charge nothing.
+- Topics, payload bytes, backlog, consumer offsets, and wildcard query work are bounded: 128 topics, 4096 UTF-8 payload bytes, 256 queued messages/topic, 128 consumers/topic, and 32 wildcard-matched topics/call.
+- Empty polls never create persistent topic or consumer state. Relay associations are cached only while their chunks are loaded; moved or removed relays are rediscovered without chunk loading.
+- Legacy global broker records without a trustworthy dimension are retained in a quarantine field and are not delivered. Delivery is at-least-once per consumer offset until that offset is persisted; a crash may repeat the final delivered batch.
+- `consumerId` enables lightweight consumer groups with independent offsets. Wildcards in `pollMatch` support `*` and `?`.
 
 ### Lua Example
 ```lua

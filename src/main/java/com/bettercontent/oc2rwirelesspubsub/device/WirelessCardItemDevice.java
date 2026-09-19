@@ -17,10 +17,13 @@ import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class WirelessCardItemDevice {
     private static final int BASE_ENERGY_COST = 4;
     private static final int ENERGY_PER_32_BYTES = 1;
+    private static final int RELAY_RANGE = 16;
 
     private WirelessCardItemDevice() {
     }
@@ -34,6 +37,7 @@ public final class WirelessCardItemDevice {
 
     private static final class CardRpcDevice implements NamedDevice {
         private final ItemDeviceQuery query;
+        private final Map<String, BlockPos> relayAssociations = new ConcurrentHashMap<>();
 
         private CardRpcDevice(final ItemDeviceQuery query) {
             this.query = query;
@@ -59,7 +63,11 @@ public final class WirelessCardItemDevice {
             }
 
             final HostContext host = getHostContext();
-            final WirelessRelayBlockEntity sourceRelay = nearestRelay(host.level(), host.hostPos(), 16)
+            final WirelessNetworkSavedData broker = WirelessNetworkSavedData.get(host.level());
+            if (!broker.canPublish(normalizedTopic, payload)) {
+                throw new IllegalArgumentException("wireless topic, payload, or storage limit rejected publication");
+            }
+            final WirelessRelayBlockEntity sourceRelay = nearestRelay(host)
                 .orElseThrow(() -> new IllegalStateException("No wireless relay in range of this computer."));
 
             final int payloadBytes = payload.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
@@ -68,7 +76,7 @@ public final class WirelessCardItemDevice {
                 throw new IllegalStateException("Source relay has insufficient energy.");
             }
 
-            WirelessNetworkSavedData.get(host.level().getServer()).publish(normalizedTopic, payload, new WirelessNetworkSavedData.Origin(host.owner(),host.hostId(),java.util.UUID.randomUUID().toString(),energyCost,payloadBytes));
+            broker.publish(normalizedTopic, payload, new WirelessNetworkSavedData.Origin(host.owner(),host.hostId(),java.util.UUID.randomUUID().toString(),energyCost,payloadBytes));
             return List.of(energyCost, payloadBytes);
         }
 
@@ -79,7 +87,7 @@ public final class WirelessCardItemDevice {
             final String normalizedTopic = requireTopic(topic);
             final String normalizedConsumer = normalizeConsumerId(consumerId);
             var host=getHostContext();
-            var messages=WirelessNetworkSavedData.get(host.level().getServer()).pollDelivered(normalizedTopic, normalizedConsumer, max);
+            var messages=WirelessNetworkSavedData.get(host.level()).pollDelivered(normalizedTopic, normalizedConsumer, max);
             received(host,messages);
             return messages.stream().map(WirelessNetworkSavedData.Delivery::payload).toList();
         }
@@ -99,19 +107,19 @@ public final class WirelessCardItemDevice {
                 throw new IllegalArgumentException("pattern cannot be empty");
             }
             var host=getHostContext();
-            var messages=WirelessNetworkSavedData.get(host.level().getServer()).pollMatchDelivered(pattern, normalizeConsumerId(consumerId), maxPerTopic);
+            var messages=WirelessNetworkSavedData.get(host.level()).pollMatchDelivered(pattern, normalizeConsumerId(consumerId), maxPerTopic);
             received(host,messages);
             return messages.stream().map(m->m.topic()+"|"+m.payload()).toList();
         }
 
         @Callback
         public List<String> listTopics() {
-            return WirelessNetworkSavedData.get(getHostContext().level().getServer()).listTopics();
+            return WirelessNetworkSavedData.get(getHostContext().level()).listTopics();
         }
 
         @Callback
         public int getTopicDepth(@Parameter("topic") @Nullable final String topic) {
-            return WirelessNetworkSavedData.get(getHostContext().level().getServer()).topicDepth(requireTopic(topic));
+            return WirelessNetworkSavedData.get(getHostContext().level()).topicDepth(requireTopic(topic));
         }
 
         @Override
@@ -157,13 +165,25 @@ public final class WirelessCardItemDevice {
             throw new IllegalStateException("Wireless card is not in a server-side OC2R host context.");
         }
 
-        private Optional<WirelessRelayBlockEntity> nearestRelay(final Level level, final BlockPos origin, final int range) {
+        private Optional<WirelessRelayBlockEntity> nearestRelay(final HostContext host) {
+            final Level level = host.level();
+            final BlockPos origin = host.hostPos();
+            final String key = level.dimension().location() + "|" + host.hostId() + "|" + origin.asLong();
+            final BlockPos cached = relayAssociations.get(key);
+            if (cached != null && level.hasChunkAt(cached)) {
+                final BlockEntity blockEntity = level.getBlockEntity(cached);
+                if (blockEntity instanceof WirelessRelayBlockEntity relay && relay.getBlockPos().distSqr(origin) <= RELAY_RANGE * RELAY_RANGE) {
+                    return Optional.of(relay);
+                }
+                relayAssociations.remove(key, cached);
+            }
             WirelessRelayBlockEntity closest = null;
             double closestDist = Double.MAX_VALUE;
-            final BlockPos min = origin.offset(-range, -range, -range);
-            final BlockPos max = origin.offset(range, range, range);
+            final BlockPos min = origin.offset(-RELAY_RANGE, -RELAY_RANGE, -RELAY_RANGE);
+            final BlockPos max = origin.offset(RELAY_RANGE, RELAY_RANGE, RELAY_RANGE);
 
             for (final BlockPos cursor : BlockPos.betweenClosed(min, max)) {
+                if (!level.hasChunkAt(cursor)) continue;
                 final BlockEntity blockEntity = level.getBlockEntity(cursor);
                 if (blockEntity instanceof WirelessRelayBlockEntity relay) {
                     final double dist = relay.getBlockPos().distSqr(origin);
@@ -173,7 +193,7 @@ public final class WirelessCardItemDevice {
                     }
                 }
             }
-
+            if (closest != null) relayAssociations.put(key, closest.getBlockPos());
             return Optional.ofNullable(closest);
         }
     }

@@ -205,4 +205,45 @@ final class WirelessNetworkSavedDataTest {
         org.junit.jupiter.api.Assertions.assertFalse(origin.receivedBy("computer-a"));assertTrue(origin.receivedBy("computer-b"));
         org.junit.jupiter.api.Assertions.assertFalse(new WirelessNetworkSavedData.Origin(null,"computer-a","message",5,8).receivedBy("computer-b"));
     }
+    @Test void absentPollsDoNotCreateTopicsOrConsumerOffsets(){
+        assertTrue(broker.poll("never-published","reader",8).isEmpty());
+        assertTrue(broker.pollMatch("nothing.*","reader",8).isEmpty());
+        assertTrue(broker.listTopics().isEmpty());
+        assertTrue(broker.save(new net.minecraft.nbt.CompoundTag()).getList("topics",net.minecraft.nbt.Tag.TAG_COMPOUND).isEmpty());
+    }
+    @Test void legacyUnscopedMessagesAreQuarantinedInsteadOfBeingAssignedToADimension(){
+        var legacy=new net.minecraft.nbt.CompoundTag();var topics=new net.minecraft.nbt.ListTag();var topic=new net.minecraft.nbt.CompoundTag();topic.putString("topic","old");topics.add(topic);legacy.put("topics",topics);
+        var restored=WirelessNetworkSavedData.load(legacy,"minecraft:overworld");
+        assertEquals(1,restored.quarantinedLegacyCount());assertTrue(restored.listTopics().isEmpty());
+        assertEquals(1,WirelessNetworkSavedData.load(restored.save(new net.minecraft.nbt.CompoundTag()),"minecraft:overworld").quarantinedLegacyCount());
+    }
+    @Test void topicPayloadAndTopicCountAreBoundedBeforePublication(){
+        assertTrue(!broker.canPublish("x".repeat(WirelessNetworkSavedData.MAX_TOPIC_LENGTH+1),"ok"));
+        assertTrue(!broker.canPublish("ok","x".repeat(WirelessNetworkSavedData.MAX_PAYLOAD_BYTES+1)));
+        for(int i=0;i<WirelessNetworkSavedData.MAX_TOPICS;i++)broker.publish("t"+i,"x");
+        assertTrue(!broker.canPublish("overflow","x"));assertEquals(WirelessNetworkSavedData.MAX_TOPICS,broker.listTopics().size());
+    }
+    @Test void consumerOffsetsAreBoundedWithoutChangingPublishedMessages(){
+        broker.publish("bounded-consumers","message");
+        for(int i=0;i<WirelessNetworkSavedData.MAX_CONSUMERS_PER_TOPIC;i++)assertEquals(List.of("message"),broker.poll("bounded-consumers","c"+i,1));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,()->broker.poll("bounded-consumers","one-too-many",1));
+        assertEquals(1,broker.topicDepth("bounded-consumers"));
+    }
+    @Test void invalidConsumerAndWildcardInputsAreRejectedWithoutCreatingState(){
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,()->broker.poll("missing","",1));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,()->broker.poll("missing","x".repeat(129),1));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,()->broker.pollMatch("", "reader", 1));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,()->broker.poll(null,"reader",1));
+        assertTrue(broker.listTopics().isEmpty());
+    }
+    @Test void wildcardWorkStopsAtTheConfiguredTopicLimit(){
+        for(int i=0;i<WirelessNetworkSavedData.MAX_MATCHED_TOPICS+2;i++)broker.publish(String.format("group-%02d",i),"x");
+        assertEquals(WirelessNetworkSavedData.MAX_MATCHED_TOPICS,broker.pollMatch("group-*","reader",1).size());
+    }
+    @Test void savedDimensionCannotBeReadAsAnotherDimension(){
+        broker.publish("local","message");
+        var tag=broker.save(new net.minecraft.nbt.CompoundTag());
+        var other=WirelessNetworkSavedData.load(tag,"minecraft:the_nether");
+        assertTrue(other.listTopics().isEmpty());assertEquals(1,other.quarantinedLegacyCount());
+    }
 }

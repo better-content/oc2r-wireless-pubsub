@@ -93,7 +93,7 @@ public final class WirelessRelayBlockEntity extends BlockEntity implements Named
         if (!(level instanceof ServerLevel)) {
             return List.of();
         }
-        return WirelessNetworkSavedData.get(((ServerLevel)level).getServer()).listTopics();
+        return WirelessNetworkSavedData.get((ServerLevel) level).listTopics();
     }
 
     @Callback
@@ -101,7 +101,7 @@ public final class WirelessRelayBlockEntity extends BlockEntity implements Named
         if (!(level instanceof ServerLevel)) {
             return 0;
         }
-        return WirelessNetworkSavedData.get(((ServerLevel)level).getServer()).topicDepth(topic);
+        return WirelessNetworkSavedData.get((ServerLevel) level).topicDepth(topic);
     }
 
     @Callback(synchronize = false)
